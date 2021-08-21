@@ -1,0 +1,112 @@
+<!DOCTYPE html>
+<html>
+  <head>
+    <title>Socket.IO chat</title>
+    <style>
+      body { margin: 0; padding-bottom: 3rem; font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Helvetica, Arial, sans-serif; }
+
+      #form { background: rgba(0, 0, 0, 0.15); padding: 0.25rem; position: fixed; bottom: 0; left: 0; right: 0; display: flex; height: 3rem; box-sizing: border-box; backdrop-filter: blur(10px); }
+      #input { border: none; padding: 0 1rem; flex-grow: 1; border-radius: 2rem; margin: 0.25rem; }
+      #input:focus { outline: none; }
+      #form > button { background: #333; border: none; padding: 0 1rem; margin: 0.25rem; border-radius: 3px; outline: none; color: #fff; }
+
+      #messages { list-style-type: none; margin: 0; padding: 0; }
+      #messages > li { padding: 0.5rem 1rem; }
+      #messages > li:nth-child(odd) { background: #efefef; }
+    </style>
+  </head>
+  <body>
+    <video controls id="video"></video>
+    <input type="text" />
+    <button id="load">Load</button>
+
+    <ul id="messages"></ul>
+
+    <form id="form" action="">
+      <input id="input" autocomplete="off" /><button>Send</button>
+    </form>
+
+    <script src="/socket.io/socket.io.js"></script>
+    <script src="https://cdn.bootcss.com/flv.js/1.4.2/flv.min.js"></script>
+
+    <script>
+        
+        if (flvjs.isSupported()) {
+            document.querySelector("#load").addEventListener("click", function () {
+                const target = document.querySelector("input").value;
+                if(document.getElementById('video'))
+                {
+                    const video = document.getElementById('video');
+                    const flvPlayer = flvjs.createPlayer({
+                        type: 'flv',
+                        url: `http://192.168.50.161:8000/live/${target}.flv`
+                    });
+                    flvPlayer.attachMediaElement(video)
+                    flvPlayer.load();
+                    flvPlayer.play();
+                }
+
+                console.log('target: ', target);
+
+                var socket = io.connect('http://192.168.50.161:3000');
+
+                socket.emit('create', target);
+
+                var messages = document.getElementById('messages');
+                var form = document.getElementById('form');
+                var input = document.getElementById('input');
+
+                form.addEventListener('submit', function(e) {
+                    e.preventDefault();
+                    if (input.value) {
+                        var obj = { 
+                            room: target, 
+                            msg: "【" + new Date().format("yyyy-MM-dd hh:mm:ss") + "】" + " " + socket.id + "：" + input.value 
+                        };
+                        socket.emit('chat message', obj);
+                        input.value = '';
+                    }
+                });
+
+                socket.on('chat message', function(msg) {
+                    var item = document.createElement('li');
+                    item.textContent = msg;
+                    messages.appendChild(item);
+                    window.scrollTo(0, document.body.scrollHeight);
+                });
+            })
+        }
+
+        var hrefsplit = window.location.href.replace('http://','').split('/');
+        var name = hrefsplit.length == 2 ? hrefsplit[1]: '';
+        console.log('name: ', name);
+        if (name != '')
+        {
+            document.querySelector("input").value = name;
+            document.getElementById("video").remove();
+            document.getElementById("load").click();
+            console.log('click');
+        }
+
+        Date.prototype.format = function (format) {
+           var args = {
+               "M+": this.getMonth() + 1,
+               "d+": this.getDate(),
+               "h+": this.getHours(),
+               "m+": this.getMinutes(),
+               "s+": this.getSeconds(),
+               "q+": Math.floor((this.getMonth() + 3) / 3),  //quarter
+               "S": this.getMilliseconds()
+           };
+           if (/(y+)/.test(format))
+               format = format.replace(RegExp.$1, (this.getFullYear() + "").substr(4 - RegExp.$1.length));
+           for (var i in args) {
+               var n = args[i];
+               if (new RegExp("(" + i + ")").test(format))
+                   format = format.replace(RegExp.$1, RegExp.$1.length == 1 ? n : ("00" + n).substr(("" + n).length));
+           }
+           return format;
+        };
+    </script>
+  </body>
+</html>
